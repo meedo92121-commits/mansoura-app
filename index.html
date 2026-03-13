@@ -69,8 +69,8 @@
                 const { error } = await supabaseClient.from('expenses').insert([{
                     description: item.description,
                     amount: item.amount,
-const S_URL = 'https://stqpublftpzvwpbrklow.supabase.co'; // الرابط الذي وجدته في Data API
-const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // المفتاح الطويل الذي يبدأ بـ eyJ
+        const S_URL = 'ضع هنا رابط المشروع Project URL'; 
+        const S_KEY = 'ضع هنا المفتاح الطويل جداً الذي يبدأ بـ eyJ';
                 }]);
                 if (!error) await db.expenses.update(item.id, { sync_status: 'synced' });
             }
