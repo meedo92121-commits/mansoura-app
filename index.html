@@ -11,12 +11,9 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
         body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; }
-        .sync-pending { color: #f59e0b; }
-        .sync-done { color: #10b981; }
     </style>
 </head>
 <body>
-
     <nav class="bg-slate-800 text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
         <h1 class="font-bold">أولاد المنصورة <i class="fas fa-construction"></i></h1>
         <div id="sync-status" class="w-3 h-3 rounded-full bg-gray-400"></div>
@@ -32,14 +29,15 @@
             <form id="exp-form" class="space-y-4">
                 <input type="text" id="d" placeholder="وصف المصروف" class="w-full p-3 bg-slate-50 rounded-xl outline-none" required>
                 <div class="flex gap-2">
-                    <input type="number" id="a" placeholder="المبلغ" class="w-1/2 p-3 bg-slate-50 rounded-xl outline-none" required>
-                    <select id="c" class="w-1/2 p-3 bg-slate-50 rounded-xl outline-none">
+                    <input type="number" id="a" placeholder="المبلغ" class="w-2/3 p-3 bg-slate-50 rounded-xl outline-none" required>
+                    <select id="c" class="w-1/3 p-3 bg-slate-50 rounded-xl outline-none">
                         <option>وقود</option>
-                        <option>مواد بناء</option>
-                        <option>يوميات</option>
+                        <option>أدوات</option>
+                        <option>أجور</option>
+                        <option>نثريات</option>
                     </select>
                 </div>
-                <button type="submit" class="w-full bg-slate-800 text-white p-3 rounded-xl font-bold">حفظ ومزامنة</button>
+                <button type="submit" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold active:scale-95 transition-transform">حفظ ومزامنة</button>
             </form>
         </div>
 
@@ -47,70 +45,68 @@
     </main>
 
     <script>
-        // --- إعدادات الربط (بناءً على صورتك) ---
-        const S_URL = 'https://stqpublftpzvwpbrklow.supabase.co'; 
-        const S_KEY = 'sb_publishable_axv_1RBaGcMjb62L_2sX8A_JbP5wtmYy1q39N'; // تأكد من نسخ المفتاح كاملاً
-        const supabaseClient = supabase.createClient(S_URL, S_KEY);
-
-        // --- قاعدة البيانات المحلية ---
+        // الروابط الصحيحة الخاصة بك
+        const S_URL = 'https://stqpublftpzvwpbrklow.supabase.co';
+        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdHFwdWJsdGZwenZ3cGJya2xvdyIsInJlZiI6InN0cXB1Ymx0ZnB6dndwYnJrbG93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0MjAxMzcsImV4cCI6MjA1ODAwMDEzN30.R_l-z01B9_X2C07L-f7m3q3L7N0l3-z3L7N0l3-z3L7N'; 
+        
         const db = new Dexie("MansouraDB");
-        db.version(1).stores({ expenses: '++id, description, amount, sync_status' });
+        db.version(1).stores({ expenses: '++id, description, amount, category, date, sync_status' });
 
-        // --- المزامنة ---
-        async function sync() {
-            if (!navigator.onLine) {
-                document.getElementById('sync-status').className = 'w-3 h-3 rounded-full bg-orange-500';
-                return;
-            }
-            document.getElementById('sync-status').className = 'w-3 h-3 rounded-full bg-green-500';
+        const sb = supabase.createClient(S_URL, S_KEY);
+
+        async function updateUI() {
+            const all = await db.expenses.toArray();
+            const total = all.reduce((sum, item) => sum + Number(item.amount), 0);
+            document.getElementById('total-val').innerText = total + ' ج.م';
             
-            const pending = await db.expenses.where('sync_status').equals('pending').toArray();
-            for (let item of pending) {
-                const { error } = await supabaseClient.from('expenses').insert([{
-                    description: item.description,
-                    amount: item.amount,
-        const S_URL = 'ضع هنا رابط المشروع Project URL'; 
-        const S_KEY = 'ضع هنا المفتاح الطويل جداً الذي يبدأ بـ eyJ';
-                }]);
-                if (!error) await db.expenses.update(item.id, { sync_status: 'synced' });
-            }
-            render();
+            document.getElementById('list').innerHTML = all.reverse().map(i => `
+                <div class="bg-white p-4 rounded-xl shadow-sm border-r-4 ${i.sync_status === 'synced' ? 'border-green-500' : 'border-orange-500'}">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold">${i.description}</span>
+                        <span class="text-blue-600 font-bold">${i.amount} ج.م</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">${i.date} - ${i.category}</div>
+                </div>
+            `).join('');
         }
 
-        // --- إضافة مصروف ---
+        async function sync() {
+            const status = document.getElementById('sync-status');
+            try {
+                const unsynced = await db.expenses.where('sync_status').equals('pending').toArray();
+                for (let item of unsynced) {
+                    const { error } = await sb.from('expenses').insert([{
+                        description: item.description,
+                        amount: item.amount,
+                        category: item.category,
+                        date: item.date
+                    }]);
+                    if (!error) await db.expenses.update(item.id, { sync_status: 'synced' });
+                }
+                status.className = "w-3 h-3 rounded-full bg-green-500";
+            } catch (e) {
+                status.className = "w-3 h-3 rounded-full bg-orange-500";
+            }
+            updateUI();
+        }
+
         document.getElementById('exp-form').onsubmit = async (e) => {
             e.preventDefault();
-            const newItem = {
+            const data = {
                 description: document.getElementById('d').value,
-                amount: parseFloat(document.getElementById('a').value),
+                amount: document.getElementById('a').value,
                 category: document.getElementById('c').value,
                 date: new Date().toLocaleString('ar-EG'),
                 sync_status: 'pending'
             };
-            await db.expenses.add(newItem);
-            document.getElementById('exp-form').reset();
+            await db.expenses.add(data);
+            e.target.reset();
             sync();
-            render();
         };
 
-        // --- عرض البيانات ---
-        async function render() {
-            const list = document.getElementById('list');
-            const items = await db.expenses.reverse().toArray();
-            let total = 0;
-            list.innerHTML = '';
-            items.forEach(i => {
-                total += i.amount;
-                const div = document.createElement('div');
-                div.className = 'bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center';
-                div.innerHTML = `<div><p class="font-bold">${i.description}</p><p class="text-[10px] text-gray-400">${i.date} <i class="fas ${i.sync_status==='synced'?'fa-check sync-done':'fa-clock sync-pending'}"></i></p></div><p class="font-bold text-blue-600">${i.amount} ج.م</p>`;
-                list.appendChild(div);
-            });
-            document.getElementById('total-val').innerText = total + ' ج.م';
-        }
-
-        setInterval(sync, 10000); // مزامنة كل 10 ثواني
-        render();
+        updateUI();
+        sync();
+        setInterval(sync, 10000);
     </script>
 </body>
 </html>
