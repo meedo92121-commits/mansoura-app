@@ -16,7 +16,7 @@
 <body>
     <nav class="bg-slate-800 text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
         <h1 class="font-bold">أولاد المنصورة <i class="fas fa-construction"></i></h1>
-        <div id="sync-status" class="w-3 h-3 rounded-full bg-gray-400"></div>
+        <div id="sync-status" class="w-3 h-3 rounded-full bg-gray-400 border border-white"></div>
     </nav>
 
     <main class="p-4 mb-20">
@@ -45,9 +45,10 @@
     </main>
 
     <script>
-        // الروابط الصحيحة الخاصة بك من واقع الصور
+        // الروابط من واقع صورك - تأكد من نسخ الـ Anon Key كاملاً من إعدادات Supabase
         const S_URL = 'https://stqpublftpzvwpbrklow.supabase.co';
-        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0cXB1YmxmdHB6dndwYnJrbG93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5MTYyNjIsImV4cCI6MjA1NjQ5MjI2Mn0.C6IikpXVCJ9.eyJu...'; // تأكد من نسخ المفتاح كاملاً من Supabase
+        // ملاحظة: استبدل المفتاح بالكامل من إعدادات مشروعك (API -> anon public)
+        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0cXB1YmxmdHB6dndwYnJrbG93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5MTYyNjIsImV4cCI6MjA1NjQ5MjI2Mn0.z-Ie_lP9E3fH8m7o-yK-mX9_L_r-mX9_L_r'; 
 
         const supabaseClient = supabase.createClient(S_URL, S_KEY);
 
@@ -75,18 +76,28 @@
             const status = document.getElementById('sync-status');
             try {
                 const unsynced = await db.expenses.where('sync_status').equals('pending').toArray();
+                if (unsynced.length === 0) {
+                    status.className = "w-3 h-3 rounded-full bg-green-500 border border-white";
+                    return;
+                }
+
                 for (let item of unsynced) {
                     const { error } = await supabaseClient.from('expenses').insert([{
                         description: item.description,
-                        amount: item.amount,
+                        amount: Number(item.amount), // تأكد أنه رقم
                         category: item.category,
                         date: item.date
                     }]);
-                    if (!error) await db.expenses.update(item.id, { sync_status: 'synced' });
+                    
+                    if (!error) {
+                        await db.expenses.update(item.id, { sync_status: 'synced' });
+                    } else {
+                        console.error("خطأ في المزامنة:", error);
+                        status.className = "w-3 h-3 rounded-full bg-red-500 border border-white";
+                    }
                 }
-                status.className = "w-3 h-3 rounded-full bg-green-500";
             } catch (e) {
-                status.className = "w-3 h-3 rounded-full bg-red-500";
+                status.className = "w-3 h-3 rounded-full bg-red-500 border border-white";
             }
             updateUI();
         }
@@ -105,8 +116,10 @@
             sync();
         };
 
+        // تشغيل أولي
         updateUI();
-        setInterval(sync, 10000);
+        // محاولة مزامنة كل 5 ثواني
+        setInterval(sync, 5000);
     </script>
 </body>
 </html>
